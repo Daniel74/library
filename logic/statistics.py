@@ -1,5 +1,5 @@
-from book import Book
-from .member import Member
+from logic.book import Book
+from logic.member import Member
 
 class Statistics:
     def __init__(self):

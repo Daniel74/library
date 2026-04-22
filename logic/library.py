@@ -1,8 +1,8 @@
 from datetime import date, timedelta
-from .date_simulation import DateSimulation
-from .book import Book
-from .member import Member
-from .statistics import Statistics
+from logic.date_simulation import DateSimulation
+from logic.book import Book
+from logic.member import Member
+from logic.statistics import Statistics
 
 
 

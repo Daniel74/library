@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from .member import Member
+from logic.member import Member
 
 class Book:
     LOAN_DURATION_DAYS: int = 14

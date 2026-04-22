@@ -1,6 +1,6 @@
 from datetime import date, timedelta
-from .book import Book
-from .library import Library
+from logic.book import Book
+from logic.library import Library
 
 class Member:
     def __init__(self, name: str, member_id: int):
