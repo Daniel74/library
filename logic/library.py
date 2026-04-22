@@ -73,14 +73,23 @@ class Library:
             books_string = books_string + book.__str__() + "\n"
         return books_string
     
-    def borrow_book(self, today: date, member: 'Member', isbn: str) -> bool:
+    def borrow_book(self, today: date, member: Member, isbn: str) -> bool:
         """
-        Borrows a book with specified ISBN. Returns True, if this book exists in the library and can be borrowed. Otherwise, False is returned.
+        Borrows a book with specified ISBN. Returns True, if this book exists in the library and can be borrowed by member and book object. Otherwise, False is returned.
         """
+
+        if not member.can_borrow_book():
+            return False
+
         book = self.find_book(isbn)
         if book is None:
             return False
-        return book.borrow(today, member)
+        
+        success = book.borrow(today)
+        if success:
+            member.borrowed_books.append(book)
+
+        return success 
     
     def _calculate_late_fee(self, today, isbn: str) -> float | None:
         """
@@ -94,24 +103,25 @@ class Library:
         overdue_days = today - book.due_date
         return round(overdue_days.days * Library.DAILY_LATE_FEE, 2)
 
-    def return_book(self, today: date, isbn: str) -> tuple[bool, float | None]:
+    def return_book(self, today: date, member: Member, isbn: str) -> bool:
         """
         Returns a book with specified ISBN to the library. Method returns a tuple with True and with late fee, if library.return_book succeeds, otherwise False and None. If the wait list is not empty, the book is borrowed to the next member in the wait list.
         """
         book = self.find_book(isbn)
         if not book:
-            return False, None
+            return False
+        
         late_fee = self._calculate_late_fee(today, isbn)
-        success = book.return_book()
+        if late_fee is None:
+            return False
+        
+        member.fee_balance += late_fee
 
-        # manage wait list and borrow book to next member if available
-        if success and len(book.wait_list) > 0:
-            next_member = book.wait_list[0]
-            if next_member.can_borrow_book():
-                success = next_member.borrow_book(today, self, isbn)
-                if success:
-                    book.wait_list.pop(0)
-        return success, late_fee
+        success = book.return_book()
+        if not success:
+            return False
+        
+        return member.remove_book(isbn)
 
 
 if __name__ == "__main__":
@@ -132,29 +142,12 @@ if __name__ == "__main__":
     m1 = Member("Eva", 0)
     m2 = Member("Fred", 1)
 
-    # Test borrow book with wait list
-    assert m1.borrow_book(date_sim.today, lib, "123"), "Error: Book b1 cannot be borrowed, even though it is available."
-    assert not m2.borrow_book(date_sim.today, lib, "123"), "Error: Book b1 can be borrowed, even though it is not available." 
+    # Test borrow book
+    assert lib.borrow_book(date_sim.today, m1, "123"), "Error: Book b1 cannot be borrowed, even though it is available."
+    assert not lib.borrow_book(date_sim.today, m2, "123"), "Error: Book b1 can be borrowed, even though it is not available." 
 
     print("------- Test Book: -----------")
     print(lib.find_book("123"))
-    assert m2 in b1.wait_list, "Error: Member m2 not in wait list." 
-
-    # Test m1.return_book with borrowing book to first member m2 in wait list
-    assert m1.return_book(date_sim.today, lib, "123"), "Error: Book b1 cannot be returned, even though it is not available."
-    assert not b1 in m1.borrowed_books, "Error: Book b1 still in borrowed books list of m1"
-    assert b1 in m2.borrowed_books, "Error: Book b1 not added to borrowed books list of m2"
-    assert not m2 in b1.wait_list, "Error: Member m2 still in wait list."
-
-    # Test that member m2 has borrowed three books and thus cannot borrow book from waiting list, if m1 returns book.
-    print("------- Members in Test: ----------")
-    print(m1)
-    print(m2) # m2 has already Python Basics borrowed, so borrow two more books for m2
-    assert m2.borrow_book(date_sim.today,lib, "456"), "Error: Book b2 cannot be borrowed by m2, even though only 1 book borrowed and book is available."
-    assert m2.borrow_book(date_sim.today,lib, "789"), "Error: Book b3 cannot be borrowed by m2, even though only 1 book borrowed and book is available."
-    assert m1.borrow_book(date_sim.today,lib, "321"), "Error: Book b4 cannot be borrowed by m1, even though is available and m1 has less than three books borrowed."
-    assert m1.return_book(date_sim.today, lib, "321"), "Error: m1 cannot return book b4, even though it is not available."
-    assert not b4 in m2.borrowed_books, "Error: Book b4 was borrowed from waiting list to m2, even though m2 has already borrowed three books."
 
     # Test for Faelligkeitsdatum und Gebührensystem mit Simulation
     date_sim = DateSimulation()
@@ -166,14 +159,14 @@ if __name__ == "__main__":
     assert lib.add_book(b2), "Error: Cannot add book."
 
     eva = Member("Eva", 0)
-    eva.borrow_book(date_sim.today, lib, "123")
+    lib.borrow_book(date_sim.today, eva, "123")
     date_sim.advance_date(7)
-    eva.borrow_book(date_sim.today, lib, "456")
+    lib.borrow_book(date_sim.today, eva, "456")
     date_sim.advance_date(8)
     assert b1.is_overdue(date_sim.today), "Error: Book b1 should be overdue."
     assert not b2.is_overdue(date_sim.today), "Error: Book b2 should not be overdue."
-    assert eva.return_book(date_sim.today, lib, "123") and eva.fee_balance == 0.5, "Error: Overdue fee should be 0.5."
-    assert eva.return_book(date_sim.today, lib, "456") and eva.fee_balance == 0.5, "Error: There should be no late fee."
+    assert lib.return_book(date_sim.today, eva, "123") and eva.fee_balance == 0.5, "Error: Overdue fee should be 0.5."
+    assert lib.return_book(date_sim.today, eva, "456") and eva.fee_balance == 0.5, "Error: There should be no late fee."
     
     # Test library.register_member
     lib = Library()
@@ -196,10 +189,10 @@ if __name__ == "__main__":
     assert lib.add_book(b1), "Error: Cannot add book."
     assert lib.add_book(b2), "Error: Cannot add book."
 
-    assert eva.borrow_book(date_sim.today, lib, "123"), "Error: borrow_book should succeed."
-    assert fred.borrow_book(date_sim.today, lib, "456"), "Error: borrow_book should succeed."
-    assert fred.return_book(date_sim.today, lib, "456"), "Error: return_book should succeed."
-    assert eva.borrow_book(date_sim.today, lib, "456"), "Error: borrow_book should succeed."
+    assert lib.borrow_book(date_sim.today, eva, "123"), "Error: borrow_book should succeed."
+    assert lib.borrow_book(date_sim.today, fred, "456"), "Error: borrow_book should succeed."
+    assert lib.return_book(date_sim.today, fred, "456"), "Error: return_book should succeed."
+    assert lib.borrow_book(date_sim.today, eva, "456"), "Error: borrow_book should succeed."
     stats = lib.get_statistics()
 
     # stats test total borrowed counts of books

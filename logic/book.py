@@ -1,5 +1,4 @@
 from datetime import date, timedelta
-from logic.member import Member
 
 class Book:
     LOAN_DURATION_DAYS: int = 14
@@ -9,16 +8,15 @@ class Book:
         self.author: str = author
         self.isbn: str = isbn
         self.is_available: bool = True
-        self.wait_list: list = []
         self.due_date: date | None = None
         self.total_borrowed_count: int = 0
     
-    def borrow(self, today: date, member: 'Member') -> bool:
+    def borrow(self, today: date) -> bool:
         """
-        Returns True, if book is available and can be borrowed. False is returned if book is not availabe and cannot be borrowed. In this case, the member is stored in the wait list of the book.
+        Returns True, if book is available and can be borrowed. False is returned if book is not availabe and cannot be borrowed.
         """
+        
         if not self.is_available:
-            self.wait_list.append(member)
             return False
         
         self.is_available = False 
@@ -48,4 +46,4 @@ class Book:
         """
         Returns string representation of book.
         """
-        return f"Book with title {self.title}, from author {self.author}, and ISBN {self.isbn} is {'available' if self.is_available else 'borrowed'}.\nThe wait list is {self.wait_list}.\nDue Date is {self.due_date}."
+        return f"Book with title {self.title}, from author {self.author}, and ISBN {self.isbn} is {'available' if self.is_available else 'borrowed'}.\nDue Date is {self.due_date}."
